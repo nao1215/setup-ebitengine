@@ -1,6 +1,7 @@
 # setup-ebitengine
 
 [![GitHub Marketplace](https://img.shields.io/badge/GitHub%20Marketplace-setup--ebitengine-blue?logo=github)](https://github.com/marketplace/actions/setup-ebitengine) [![Test](https://github.com/nao1215/setup-ebitengine/actions/workflows/test.yml/badge.svg)](https://github.com/nao1215/setup-ebitengine/actions/workflows/test.yml) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/nao1215/setup-ebitengine/badge)](https://scorecard.dev/viewer/?uri=github.com/nao1215/setup-ebitengine)
+[![Trivy](https://github.com/nao1215/setup-ebitengine/actions/workflows/trivy.yml/badge.svg)](https://github.com/nao1215/setup-ebitengine/actions/workflows/trivy.yml)
 
 GitHub Action to install the system packages [Ebitengine](https://ebitengine.org/) needs.
 
