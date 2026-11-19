@@ -150,12 +150,19 @@ apt_alsa_fix() {
 # ---------------------------------------------------------------------------
 # Install
 # ---------------------------------------------------------------------------
+# apt options for flaky mirrors: an Ubuntu mirror has hung apt-get update for
+# twenty minutes in CI. A 30-second connect/read timeout and three retries turn
+# that into a quick retry, or a failure the job reports, instead of a stall.
+readonly APT_NET_OPTS="-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30"
+
 install_packages() {
+  local -a apt_net
+  read -r -a apt_net <<<"$APT_NET_OPTS"
   case "$PKG_MANAGER" in
     apt)
       if is_true "${INPUT_APT_UPDATE:-true}"; then
         log "Updating the apt package index..."
-        as_root env DEBIAN_FRONTEND=noninteractive apt-get update -qq
+        as_root env DEBIAN_FRONTEND=noninteractive apt-get "${apt_net[@]}" update -qq
       fi
       apt_alsa_fix
       ;;
@@ -164,7 +171,7 @@ install_packages() {
   read -r -a pkgs <<<"$PACKAGES"
   log "Installing: ${PACKAGES}"
   case "$PKG_MANAGER" in
-    apt) as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends "${pkgs[@]}" ;;
+    apt) as_root env DEBIAN_FRONTEND=noninteractive apt-get "${apt_net[@]}" install -y -qq --no-install-recommends "${pkgs[@]}" ;;
     dnf) as_root dnf install -y -q "${pkgs[@]}" ;;
     pacman) as_root pacman -Sy --noconfirm --needed "${pkgs[@]}" ;;
     apk) as_root apk add --no-cache "${pkgs[@]}" ;;
