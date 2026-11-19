@@ -72,6 +72,36 @@ is_true() {
   esac
 }
 
+# check_bool NAME VALUE: dies unless VALUE is a spelling is_true understands,
+# so a typo such as "ture" fails the step instead of silently meaning false.
+check_bool() {
+  local name="$1" value="$2"
+  case "$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')" in
+    true|yes|1|on|false|no|0|off|"") ;;
+    *) die "invalid value for ${name}: '${value}' (expected true or false)" ;;
+  esac
+}
+
+# validate_inputs: refuses inputs that would otherwise be misread.
+validate_inputs() {
+  check_bool dev "${INPUT_DEV:-}"
+  check_bool xvfb "${INPUT_XVFB:-}"
+  check_bool apt-update "${INPUT_APT_UPDATE:-}"
+
+  # extra-packages is handed to the package manager as arguments, so a word
+  # starting with "-" would be read as an option (--allow-unauthenticated,
+  # -o APT::...) rather than as a package.
+  local word
+  local -a words
+  # A multi-line YAML value spreads the names over lines; read sees one line.
+  read -r -a words <<<"$(printf '%s' "${INPUT_EXTRA_PACKAGES:-}" | tr -s '[:space:]' ' ')"
+  for word in ${words[@]+"${words[@]}"}; do
+    case "$word" in
+      -*) die "extra-packages takes package names, not options: '${word}'" ;;
+    esac
+  done
+}
+
 # ---------------------------------------------------------------------------
 # Decide what to install. Sets PKG_MANAGER and PACKAGES.
 # ---------------------------------------------------------------------------
@@ -184,6 +214,7 @@ install_packages() {
 # Main
 # ---------------------------------------------------------------------------
 main() {
+  validate_inputs
   PKG_MANAGER=""
   if [ "${RUNNER_OS:-}" = "Linux" ]; then
     detect_package_manager

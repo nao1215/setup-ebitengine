@@ -68,6 +68,25 @@ jobs:
           echo "package-manager=${PACKAGE_MANAGER}"
           echo "packages=${PACKAGES}"
 
+      - name: Check the outputs
+        shell: bash
+        env:
+          PACKAGES: ${{ steps.setup.outputs.packages }}
+          PACKAGE_MANAGER: ${{ steps.setup.outputs.package-manager }}
+        run: |
+          set -euo pipefail
+          if [ "${RUNNER_OS}" = "Linux" ]; then
+            [ "${PACKAGE_MANAGER}" = "apt" ] || { echo "package-manager: ${PACKAGE_MANAGER}" >&2; exit 1; }
+            case " ${PACKAGES} " in
+              *" xvfb xauth "*) ;;
+              *) echo "xvfb: true did not add xvfb and xauth: ${PACKAGES}" >&2; exit 1 ;;
+            esac
+            for p in ${PACKAGES}; do dpkg -s "$p" >/dev/null || { echo "${p} is not installed" >&2; exit 1; }; done
+          else
+            [ "${PACKAGE_MANAGER}" = "none" ] || { echo "package-manager: ${PACKAGE_MANAGER}" >&2; exit 1; }
+            [ -z "${PACKAGES}" ] || { echo "packages: ${PACKAGES}" >&2; exit 1; }
+          fi
+
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: stable
@@ -170,3 +189,102 @@ jobs:
         run: |
           go build -o smoke .
           xvfb-run --auto-servernum ./smoke
+
+  # apt-update: false must skip the index update and still install, and
+  # extra-packages must reach apt-get. The first step refreshes the index so
+  # the second does not depend on the runner image's lists.
+  extra-packages:
+    name: Extra packages without apt update (ubuntu-latest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Ebitengine (refreshes the apt index)
+        uses: ./
+
+      - name: Setup Ebitengine with extra packages and no apt update
+        id: extra
+        uses: ./
+        with:
+          apt-update: "false"
+          extra-packages: |
+            libxxf86vm1
+            libxss1
+
+      - name: The extra packages are listed and installed
+        shell: bash
+        env:
+          PACKAGES: ${{ steps.extra.outputs.packages }}
+        run: |
+          set -euo pipefail
+          case " ${PACKAGES} " in
+            *" libxxf86vm1 libxss1 "*) ;;
+            *) echo "extra packages missing from the output: ${PACKAGES}" >&2; exit 1 ;;
+          esac
+          dpkg -s libxxf86vm1 libxss1 >/dev/null
+
+  # Misspelled booleans and options in extra-packages must fail the step on
+  # every OS, before anything is installed.
+  reject:
+    name: Reject invalid inputs (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: "Setup Ebitengine, expected to fail: dev: ture"
+        id: dev
+        continue-on-error: true
+        uses: ./
+        with:
+          dev: ture
+
+      - name: "Setup Ebitengine, expected to fail: xvfb: enabled"
+        id: xvfb
+        continue-on-error: true
+        uses: ./
+        with:
+          xvfb: enabled
+
+      - name: "Setup Ebitengine, expected to fail: apt-update: nope"
+        id: aptupdate
+        continue-on-error: true
+        uses: ./
+        with:
+          apt-update: nope
+
+      - name: "Setup Ebitengine, expected to fail: an option in extra-packages"
+        id: option
+        continue-on-error: true
+        uses: ./
+        with:
+          extra-packages: libfoo --allow-unauthenticated
+
+      - name: Every setup step must have failed
+        shell: bash
+        env:
+          OUTCOME_DEV: ${{ steps.dev.outcome }}
+          OUTCOME_XVFB: ${{ steps.xvfb.outcome }}
+          OUTCOME_APTUPDATE: ${{ steps.aptupdate.outcome }}
+          OUTCOME_OPTION: ${{ steps.option.outcome }}
+        run: |
+          set -euo pipefail
+          status=0
+          for name in $(compgen -A variable OUTCOME_); do
+            if [ "${!name}" = "failure" ]; then
+              echo "ok:   ${name#OUTCOME_} failed"
+            else
+              echo "FAIL: ${name#OUTCOME_} -> ${!name}" >&2
+              status=1
+            fi
+          done
+          exit "${status}"
