@@ -70,6 +70,8 @@ jobs:
 | `extra-packages` | `""`    | Additional space-separated system packages to install on Linux.              |
 | `apt-update`     | `true`  | Run `apt-get update` first on Debian / Ubuntu. Set `false` to skip it.       |
 
+The boolean inputs accept `true`, `yes`, `1`, `on` and `false`, `no`, `0`, `off` in any case; any other value, such as `ture`, fails the step. `extra-packages` takes package names separated by spaces or newlines (`name=version` and `name:arch` work with apt); a word starting with `-` is refused, because the package manager would read it as an option.
+
 ## Outputs
 
 | Name              | Description                                                          |
@@ -110,6 +112,20 @@ When you want to cut a new Marketplace release:
 1. After publish, `SyncReleaseTags` automatically moves the floating `vX` and `vX.Y` tags (for example `v1` and `v1.0`) to that release.
 
 That keeps the Marketplace listing current while preserving the immutable full release tag (`v1.0.0`, `v1.0.1`, ...).
+
+## Testing
+
+| Technique | Bug class caught here |
+|---|---|
+| [Package resolution and input boundaries](scripts/packages_test.sh) | A wrong package list for an OS, package manager or input combination, build tools leaking into the runtime set, the wrong ALSA package name, misspelled booleans read as false, and options smuggled in through `extra-packages` |
+| [Release tag normalization](scripts/release_meta_test.sh) | Floating `vX` / `vX.Y` tags computed from a malformed release tag |
+| [Real-runner builds](.github/workflows/test.yml) | Missing runtime libraries: a smoke game is built and run headless on Ubuntu (amd64 / arm64), Debian, Fedora, Arch and Alpine, built with cgo, and built on macOS and Windows; wrong outputs, `apt-update: false` and `extra-packages` not reaching apt, and invalid inputs passing on Linux and Windows |
+
+```shell
+shellcheck -x scripts/install.sh scripts/packages_test.sh scripts/release_meta.sh scripts/release_meta_test.sh
+bash scripts/packages_test.sh
+bash scripts/release_meta_test.sh
+```
 
 ## License
 
