@@ -63,6 +63,38 @@ for v in false no 0 "" off; do
   if is_true "$v"; then printf 'FAIL: is_true "%s" accepted\n' "$v"; failures=$((failures + 1)); else printf 'ok:   is_true "%s" rejected\n' "$v"; fi
 done
 
+# A multi-line extra-packages value (a YAML block scalar) is one list.
+check "ubuntu extra over lines" Linux apt  false false $'libfoo\nlibbar\n'    apt    "$APT_PACKAGES libfoo libbar"
+
+# validate_ok / validate_fails DESC DEV XVFB APT_UPDATE EXTRA [FRAGMENT]
+validate_ok() {
+  local desc="$1"
+  if (INPUT_DEV="$2" INPUT_XVFB="$3" INPUT_APT_UPDATE="$4" INPUT_EXTRA_PACKAGES="$5" validate_inputs) >/dev/null 2>&1; then
+    printf 'ok:   %s accepted\n' "$desc"
+  else
+    printf 'FAIL: %s rejected\n' "$desc"; failures=$((failures + 1))
+  fi
+}
+validate_fails() {
+  local desc="$1" frag="$6" out
+  if out="$( (INPUT_DEV="$2" INPUT_XVFB="$3" INPUT_APT_UPDATE="$4" INPUT_EXTRA_PACKAGES="$5" validate_inputs) 2>&1)"; then
+    printf 'FAIL: %s accepted\n' "$desc"; failures=$((failures + 1))
+  elif [[ "$out" == *"$frag"* ]]; then
+    printf 'ok:   %s rejected\n' "$desc"
+  else
+    printf 'FAIL: %s rejected without naming %s: %s\n' "$desc" "$frag" "$out"; failures=$((failures + 1))
+  fi
+}
+
+validate_ok    "defaults"                  ""      ""      ""     ""
+validate_ok    "every boolean spelling"    TRUE    No      off    ""
+validate_ok    "package names with pins"   false   false   true   "libfoo=1.2-3 libbar:arm64 libbaz/bookworm"
+validate_fails "dev: ture (typo)"          ture    false   true   ""   "invalid value for dev: 'ture'"
+validate_fails "xvfb: enabled"             false   enabled true   ""   "invalid value for xvfb"
+validate_fails "apt-update: nope"          false   false   nope   ""   "invalid value for apt-update"
+validate_fails "an option in extra-packages" false false true "libfoo --allow-unauthenticated" "not options: '--allow-unauthenticated'"
+validate_fails "-o on its own line"        false   false   true   $'libfoo\n-o\nAPT::Get::AllowUnauthenticated=true' "not options: '-o'"
+
 if (RUNNER_OS="FreeBSD" resolve_packages) >/dev/null 2>&1; then
   printf 'FAIL: unsupported OS was accepted\n'
   failures=$((failures + 1))
