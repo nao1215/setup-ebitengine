@@ -23,7 +23,7 @@ On Linux it installs the runtime libraries listed in the [Ebitengine install gui
 
 ## Run tests headless
 
-Tests that open a window (or call `ebiten.RunGame`) need a display. On Linux, install Xvfb and wrap the command with `xvfb-run`:
+Tests that open a window or call `ebiten.RunGame` need a display. On Linux, install Xvfb and run the tests under `xvfb-run`:
 
 ```yaml
 - uses: nao1215/setup-ebitengine@v1
@@ -92,7 +92,7 @@ The boolean inputs accept `true`, `yes`, `1`, `on` and `false`, `no`, `0`, `off`
 | macOS (Apple silicon, Intel)             | Nothing to install.                          |
 | Windows                                  | Nothing to install.                          |
 
-The action uses `sudo` when it is not running as root, so it works both on GitHub-hosted runners and inside `container:` jobs.
+The action uses `sudo` when it is not root, so it works on GitHub-hosted runners and inside `container:` jobs.
 
 ## Migrating from actions-ebitengine
 
@@ -105,13 +105,9 @@ This repository used to be `nao1215/actions-ebitengine`. The `v0` tag keeps the 
 
 ## Maintainer release flow
 
-When you want to cut a new Marketplace release:
-
 1. Run the `PrepareRelease` workflow from the Actions tab with `vX.Y.Z` (or `X.Y.Z`).
 1. Open the draft GitHub release it creates, tick `Publish this Action to the GitHub Marketplace`, then publish it.
-1. After publish, `SyncReleaseTags` automatically moves the floating `vX` and `vX.Y` tags (for example `v1` and `v1.0`) to that release.
-
-That keeps the Marketplace listing current while preserving the immutable full release tag (`v1.0.0`, `v1.0.1`, ...).
+1. After publish, `SyncReleaseTags` moves the floating `vX` and `vX.Y` tags (for example `v1` and `v1.0`) to that release. The full release tag (`v1.0.0`, `v1.0.1`, ...) never moves.
 
 ## Testing
 
